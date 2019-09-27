@@ -1,19 +1,136 @@
-"use strict";
+var zoom = function (classNames, settings) {
 
-/* @->zoom */
-zoom();
+    /* @-<addClass ****************************************************************/
+    /******************************************************************************/
+    function addClass($element, targetClass) {
+        if (hasClass($element, targetClass) === false) {
+            $element.className += " " + targetClass;
+        }
+    }
 
-/* @-<zoom ********************************************************************/
-/******************************************************************************/
-function zoom(classNames, settings) {
+    /* @-<disableScroll ***********************************************************/
+    /******************************************************************************/
+    function disableScroll() {
+        if (window.addEventListener) // older FF
+        {
+            window.addEventListener('DOMMouseScroll', preventDefault, false);
+        }
+
+        window.onwheel = preventDefault; // modern standard
+        window.onmousewheel = document.onmousewheel = preventDefault; // older browsers, IE
+        window.ontouchmove = preventDefault; // mobile
+        document.onkeydown = preventDefaultForScrollKeys;
+    }
+
+    /* @-<enableScroll ************************************************************/
+    /******************************************************************************/
+    function enableScroll() {
+        if (window.removeEventListener) {
+            window.removeEventListener('DOMMouseScroll', preventDefault, false);
+        }
+
+        window.onmousewheel = document.onmousewheel = null;
+        window.onwheel = null;
+        window.ontouchmove = null;
+        document.onkeydown = null;
+    }
+
+    /* @isWithinRange *************************************************************/
+    /******************************************************************************/
+    function isWithinRange(value, min, max) {
+        if (value >= min && value <= max) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /* @hasClass ******************************************************************/
+    /******************************************************************************/
+    function hasClass($element, targetClass) {
+        var rgx = new RegExp("(?:^|\\s)" + targetClass + "(?!\\S)", "g");
+
+        if ($element.className.match(rgx)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /* @-<massAddEventListener ****************************************************/
+    /******************************************************************************/
+    function massAddEventListener($elements, event, customFunction, useCapture) {
+        var useCapture = useCapture || false;
+
+        for (var i = 0; i < $elements.length; i++) {
+            $elements[i].addEventListener(event, customFunction, useCapture);
+        }
+    }
+
+    /* @-<minMax ******************************************************************/
+    /******************************************************************************/
+    function minMax(value, min, max) {
+        if (value < min) {
+            value = min;
+        } else if (value > max) {
+            value = max;
+        }
+
+        return value;
+    }
+
+    /* @-<moveScaleElement ********************************************************/
+    /******************************************************************************/
+    function moveScaleElement($element, targetOffsetX, targetOffsetY, targetScale) {
+        $element.style.cssText = "-moz-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); -ms-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); -o-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); -webkit-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); transform : translate3d(" + targetOffsetX + ", " + targetOffsetY + ", 0) scale3d(" + targetScale + ", " + targetScale + ", 1);";
+    }
+
+    /* @-<preventDefault **********************************************************/
+    /******************************************************************************/
+    function preventDefault(e) {
+        e = e || window.event;
+
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+
+        e.returnValue = false;
+    }
+
+    /* @preventDefaultForScrollKeys ***********************************************/
+    /******************************************************************************/
+    function preventDefaultForScrollKeys(e) {
+        var keys = {
+            37: 1,
+            38: 1,
+            39: 1,
+            40: 1
+        };
+
+        if (keys[e.keyCode]) {
+            preventDefault(e);
+            return false;
+        }
+    }
+
+    /* @removeClass ***************************************************************/
+    /******************************************************************************/
+    function removeClass($element, targetClass) {
+        var rgx = new RegExp("(?:^|\\s)" + targetClass + "(?!\\S)", "g");
+
+        $element.className = $element.className.replace(rgx, "");
+    }
+
+
     /* Settings */
-    classNames = (typeof(classNames) !== 'undefined' && Object.keys(classNames).length ? classNames : {});
-    settings = (typeof(settings) !== 'undefined' && Object.keys(settings).length ? settings : {});
-    
     var C_scaleDefault = settings["scaleDefault"] || 2; // Used on doubleclick, doubletap and resize
     var C_scaleDifference = settings["scaleDifference"] || 0.5; // Used on wheel zoom
     var C_scaleMax = settings["scaleMax"] || 10;
     var C_scaleMin = settings["scaleMin"] || 1;
+
+    /* Callbacks */
+    var onZoomStart = settings["onZoomStart"] || null;
+    var onZoomEnd = settings["onZoomEnd"] || null;
 
     /* Selectors */
     var _active = classNames["active"] || "active";
@@ -81,7 +198,7 @@ function zoom(classNames, settings) {
 
     /* EVENT - load - window ****************************************************/
     /****************************************************************************/
-    window.addEventListener("load", function() {
+    window.addEventListener("load", function () {
         /* Wait for images to be loaded */
         for (var i = 0; i < $zoom.length; i++) {
             /* Initialize selectors */
@@ -93,7 +210,7 @@ function zoom(classNames, settings) {
 
         /* EVENT - resize - window ************************************************/
         /**************************************************************************/
-        window.addEventListener("resize", function() {
+        window.addEventListener("resize", function () {
             for (var i = 0; i < $zoom.length; i++) {
                 /* Initialize selectors */
                 $container = $zoom[i];
@@ -118,6 +235,9 @@ function zoom(classNames, settings) {
 
                 if (targetScale === 1) {
                     removeClass($container, _active);
+                    if (onZoomEnd) {
+                        onZoomEnd($container);
+                    }
                 }
 
                 /* Set attributes */
@@ -153,7 +273,7 @@ function zoom(classNames, settings) {
 
     /* EVENT - touchstart - document ********************************************/
     /****************************************************************************/
-    document.addEventListener("touchstart", function() {
+    document.addEventListener("touchstart", function () {
         touchable = true;
     });
 
@@ -208,12 +328,12 @@ function zoom(classNames, settings) {
             doubleClickMonitor[1] = initialPointerOffsetX;
             doubleClickMonitor[2] = initialPointerOffsetY;
 
-            setTimeout(function() {
+            setTimeout(function () {
                 doubleClickMonitor = [null];
             }, 300);
         } else if (doubleClickMonitor[0] === e.target && mousemoveCount <= 5 && isWithinRange(initialPointerOffsetX, doubleClickMonitor[1] - 10, doubleClickMonitor[1] + 10) === true && isWithinRange(initialPointerOffsetY, doubleClickMonitor[2] - 10, doubleClickMonitor[2] + 10) === true) {
             addClass($element, _transition);
-            
+
             if (hasClass($container, _active) === true) {
                 /* Set attributes */
                 $element.setAttribute(_dataScale, 1);
@@ -221,6 +341,9 @@ function zoom(classNames, settings) {
                 $element.setAttribute(_dataTranslateY, 0);
 
                 removeClass($container, _active);
+                if (onZoomEnd) {
+                    onZoomEnd($container);
+                }
 
                 /* @->moveScaleElement */
                 moveScaleElement($element, 0, 0, 1);
@@ -231,13 +354,15 @@ function zoom(classNames, settings) {
                 $element.setAttribute(_dataTranslateY, 0);
 
                 addClass($container, _active);
+                if (onZoomStart) {
+                    onZoomStart($container);
+                }
 
                 /* @->moveScaleElement */
                 moveScaleElement($element, 0, 0, C_scaleDefault);
             }
 
-            setTimeout(function()
-            {
+            setTimeout(function () {
                 removeClass($element, _transition);
             }, 200);
 
@@ -343,12 +468,12 @@ function zoom(classNames, settings) {
                 doubleTapMonitor[1] = initialPointerOffsetX;
                 doubleTapMonitor[2] = initialPointerOffsetY;
 
-                setTimeout(function() {
+                setTimeout(function () {
                     doubleTapMonitor = [null];
                 }, 300);
             } else if (doubleTapMonitor[0] === e.target && touchmoveCount <= 1 && isWithinRange(initialPointerOffsetX, doubleTapMonitor[1] - 10, doubleTapMonitor[1] + 10) === true && isWithinRange(initialPointerOffsetY, doubleTapMonitor[2] - 10, doubleTapMonitor[2] + 10) === true) {
                 addClass($element, _transition);
-                
+
                 if (hasClass($container, _active) === true) {
                     /* Set attributes */
                     $element.setAttribute(_dataScale, 1);
@@ -356,6 +481,9 @@ function zoom(classNames, settings) {
                     $element.setAttribute(_dataTranslateY, 0);
 
                     removeClass($container, _active);
+                    if (onZoomEnd) {
+                        onZoomEnd($container);
+                    }
 
                     /* @->moveScaleElement */
                     moveScaleElement($element, 0, 0, 1);
@@ -366,13 +494,15 @@ function zoom(classNames, settings) {
                     $element.setAttribute(_dataTranslateY, 0);
 
                     addClass($container, _active);
+                    if (onZoomStart) {
+                        onZoomStart($container);
+                    }
 
                     /* @->moveScaleElement */
                     moveScaleElement($element, 0, 0, C_scaleDefault);
                 }
 
-                setTimeout(function()
-                {
+                setTimeout(function () {
                     removeClass($element, _transition);
                 }, 200);
 
@@ -403,11 +533,10 @@ function zoom(classNames, settings) {
     /* @-<touchMove *************************************************************/
     /****************************************************************************/
     function touchMove(e) {
-        e.preventDefault();
-
         if (capture === false) {
             return false;
         }
+        e.preventDefault();
 
         /* Initialize helpers */
         pointerOffsetX = e.touches[0].clientX;
@@ -435,8 +564,14 @@ function zoom(classNames, settings) {
 
                 if (targetScale > 1) {
                     addClass($container, _active);
+                    if (onZoomStart) {
+                        onZoomStart($container);
+                    }
                 } else {
                     removeClass($container, _active);
+                    if (onZoomEnd) {
+                        onZoomEnd($container);
+                    }
                 }
 
                 /* @->moveScaleElement */
@@ -545,8 +680,14 @@ function zoom(classNames, settings) {
 
         if (targetScale > 1) {
             addClass($container, _active);
+            if (onZoomStart) {
+                onZoomStart($container);
+            }
         } else {
             removeClass($container, _active);
+            if (onZoomEnd) {
+                onZoomEnd($container);
+            }
         }
 
         /* Set attributes */
@@ -559,126 +700,4 @@ function zoom(classNames, settings) {
     }
 }
 
-/* Library ********************************************************************/
-/******************************************************************************/
-
-/* @-<addClass ****************************************************************/
-/******************************************************************************/
-function addClass($element, targetClass) {
-    if (hasClass($element, targetClass) === false) {
-        $element.className += " " + targetClass;
-    }
-}
-
-/* @-<disableScroll ***********************************************************/
-/******************************************************************************/
-function disableScroll() {
-    if (window.addEventListener) // older FF
-    {
-        window.addEventListener('DOMMouseScroll', preventDefault, false);
-    }
-
-    window.onwheel = preventDefault; // modern standard
-    window.onmousewheel = document.onmousewheel = preventDefault; // older browsers, IE
-    window.ontouchmove = preventDefault; // mobile
-    document.onkeydown = preventDefaultForScrollKeys;
-}
-
-/* @-<enableScroll ************************************************************/
-/******************************************************************************/
-function enableScroll() {
-    if (window.removeEventListener) {
-        window.removeEventListener('DOMMouseScroll', preventDefault, false);
-    }
-
-    window.onmousewheel = document.onmousewheel = null;
-    window.onwheel = null;
-    window.ontouchmove = null;
-    document.onkeydown = null;
-}
-
-/* @isWithinRange *************************************************************/
-/******************************************************************************/
-function isWithinRange(value, min, max) {
-    if (value >= min && value <= max) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-/* @hasClass ******************************************************************/
-/******************************************************************************/
-function hasClass($element, targetClass) {
-    var rgx = new RegExp("(?:^|\\s)" + targetClass + "(?!\\S)", "g");
-
-    if ($element.className.match(rgx)) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-/* @-<massAddEventListener ****************************************************/
-/******************************************************************************/
-function massAddEventListener($elements, event, customFunction, useCapture) {
-    var useCapture = useCapture || false;
-
-    for (var i = 0; i < $elements.length; i++) {
-        $elements[i].addEventListener(event, customFunction, useCapture);
-    }
-}
-
-/* @-<minMax ******************************************************************/
-/******************************************************************************/
-function minMax(value, min, max) {
-    if (value < min) {
-        value = min;
-    } else if (value > max) {
-        value = max;
-    }
-
-    return value;
-}
-
-/* @-<moveScaleElement ********************************************************/
-/******************************************************************************/
-function moveScaleElement($element, targetOffsetX, targetOffsetY, targetScale) {
-    $element.style.cssText = "-moz-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); -ms-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); -o-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); -webkit-transform : translate(" + targetOffsetX + ", " + targetOffsetY + ") scale(" + targetScale + "); transform : translate3d(" + targetOffsetX + ", " + targetOffsetY + ", 0) scale3d(" + targetScale + ", " + targetScale + ", 1);";
-}
-
-/* @-<preventDefault **********************************************************/
-/******************************************************************************/
-function preventDefault(e) {
-    e = e || window.event;
-
-    if (e.preventDefault) {
-        e.preventDefault();
-    }
-
-    e.returnValue = false;
-}
-
-/* @preventDefaultForScrollKeys ***********************************************/
-/******************************************************************************/
-function preventDefaultForScrollKeys(e) {
-    var keys = {
-        37: 1,
-        38: 1,
-        39: 1,
-        40: 1
-    };
-
-    if (keys[e.keyCode]) {
-        preventDefault(e);
-        return false;
-    }
-}
-
-/* @removeClass ***************************************************************/
-/******************************************************************************/
-function removeClass($element, targetClass) {
-    var rgx = new RegExp("(?:^|\\s)" + targetClass + "(?!\\S)", "g");
-
-    $element.className = $element.className.replace(rgx, "");
-}
+export default zoom;
