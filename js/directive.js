@@ -1,3 +1,25 @@
+/*!
+* pinch to zoom
+* Author: reskilldev
+* Last update: 27.09.2019
+* https://github.com/docid00/zoom/blob/feature/mobio-adjustments/LICENSE.md
+* https://github.com/reskilldev/zoom => https://github.com/docid00/zoom/tree/feature/mobio-adjustments
+* directive.js
+* allows user to zoom an image
+* supported actions
+* - doublecklick
+* - mousemove
+* - mousewheel
+* - doubletap
+* - touchmove
+* - pinch
+*
+* <div class="zoom">
+*   <img class="media" src="https://picsum.photos/3000/1800/?random" alt="Bild" title="Bild"/>
+* </div>
+*
+*/
+
 var zoom = function (classNames, settings) {
 
     /* @-<addClass ****************************************************************/
